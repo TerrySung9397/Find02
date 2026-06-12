@@ -28,4 +28,6 @@ jobs:
           fi
 
       - name: Run screener.py
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
         run: python screener.py
