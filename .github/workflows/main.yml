@@ -9,8 +9,10 @@ on:
 jobs:
   run-screener:
     runs-on: ubuntu-latest
+    # 加入這一行來消除警告
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
-      # 1. 檢出您的 GitHub 程式碼庫
       - name: Checkout code
         uses: actions/checkout@v4
 
