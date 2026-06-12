@@ -12,17 +12,17 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
 
-# Telegram Push Configurations
+# Telegram Push Configurations (已填入您的金鑰 - 僅供本機測試)
 TELEGRAM_TOKEN = '8812419373:AAE3E5f7dBH40JmPbn7h91JzsxJfZv2tdgw'
 TELEGRAM_CHAT_ID = '-5179213819'
 
 def send_telegram_message(text):
     """Send HTML-formatted broadcast message via Telegram Bot API."""
-    print("Sending Telegram broadcast...")
+    if not TELEGRAM_TOKEN:
+        print("❌ 錯誤：找不到 TELEGRAM_TOKEN。")
         return
         
     print("Sending Telegram broadcast...")
-    
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
@@ -320,114 +320,4 @@ def main():
     for idx, chunk in enumerate(chunks):
         print(f"\nProcessing batch {idx + 1}/{len(chunks)} ({len(chunk)} tickers)...")
         try:
-            # Download past 6 months of daily data
-            # group_by='ticker' to easily access each ticker's dataframe
-            data = yf.download(chunk, period="6mo", interval="1d", group_by="ticker", threads=True, progress=False)
-            
-            for ticker in chunk:
-                processed_count += 1
-                
-                # Retrieve stock metadata
-                stock_meta = next(s for s in all_stocks if s["ticker"] == ticker)
-                
-                try:
-                    # Get ticker dataframe from the batch download
-                    if isinstance(data.columns, pd.MultiIndex):
-                        if ticker not in data.columns.levels[0]:
-                            continue
-                        df = data[ticker].dropna(subset=['Close'])
-                    else:
-                        # If only one ticker was downloaded, data is a single dataframe
-                        df = data.dropna(subset=['Close'])
-                    
-                    if df.empty or len(df) < 60:
-                        continue
-                        
-                    # Filter: Minimum trading volume.
-                    # Average volume of the past 20 days should be at least 150,000 shares (150 張)
-                    avg_vol_20 = df['Volume'].iloc[-20:].mean()
-                    if avg_vol_20 < 150000:
-                        continue
-                        
-                    # Filter: Stock price should be between 10 NTD and 1500 NTD
-                    current_price = df['Close'].iloc[-1]
-                    if current_price < 10.0 or current_price > 1500.0:
-                        continue
-                        
-                    # Check conditions
-                    is_match, details = check_conditions(df)
-                    if is_match:
-                        # Calculate price change percent
-                        price_prev = df['Close'].iloc[-2]
-                        pct_change = ((current_price - price_prev) / price_prev) * 100
-                        
-                        # Add details to results
-                        stock_result = {
-                            "code": stock_meta["code"],
-                            "name": stock_meta["name"],
-                            "market": stock_meta["market"],
-                            "industry": stock_meta["industry"],
-                            "ticker": ticker,
-                            "price": round(current_price, 2),
-                            "change_pct": round(pct_change, 2),
-                            "volume_str": f"{int(df['Volume'].iloc[-1]/1000):,}張" if df['Volume'].iloc[-1] >= 1000 else f"{int(df['Volume'].iloc[-1])}股",
-                            "volume_raw": int(df['Volume'].iloc[-1]),
-                            "indicators": details
-                        }
-                        matched_results.append(stock_result)
-                        print(f"  [MATCH] {stock_meta['code']} {stock_meta['name']} (收盤: {current_price}, 漲跌: {pct_change:.2f}%, 支撐: {details['support_desc']})")
-                        
-                except Exception as ex:
-                    # Ignore single stock processing errors
-                    continue
-                    
-        except Exception as e:
-            print(f"Error downloading batch {idx + 1}: {e}")
-            
-    print(f"\nScan complete. Processed {processed_count} tickers.")
-    print(f"Found {len(matched_results)} matching stocks.")
-    
-    # 3. Save to screener_results.json
-    output_path = "screener_results.json"
-    scan_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump({
-            "scan_time": scan_time_str,
-            "count": len(matched_results),
-            "results": matched_results
-        }, f, ensure_ascii=False, indent=2)
-        
-    print(f"Successfully saved results to {output_path}")
-
-    # 4. Telegram Push Broadcast
-    tg_lines = [
-        "🔔 <b>台股智能技術篩選 - 每日推播</b>",
-        f"📅 <b>篩選時間</b>：{scan_time_str}",
-        "🎯 <b>指標設定</b>：MACD(6, 13, 9) + KDJ低檔金叉 + 價量支撐",
-        f"🔍 <b>掃描總數</b>：{processed_count} 檔個股",
-        f"🔥 <b>今日符合條件</b>：共 <b>{len(matched_results)}</b> 檔\n",
-        "========================\n"
-    ]
-    
-    if matched_results:
-        for idx, stock in enumerate(matched_results, 1):
-            is_up = stock["change_pct"] >= 0
-            change_sign = "+" if is_up else ""
-            arrow = "🔺" if stock["change_pct"] > 0 else ("🔻" if stock["change_pct"] < 0 else "➖")
-            
-            tg_lines.append(
-                f"{idx}. <b>{stock['name']} ({stock['code']})</b> - {stock['industry']} ({stock['market']})\n"
-                f"   • 收盤價：<b>${stock['price']}</b> NTD\n"
-                f"   • 漲跌幅：{arrow} <b>{change_sign}{stock['change_pct']}%</b>\n"
-                f"   • 成交量：{stock['volume_str']}\n"
-                f"   • 關鍵支撐：<code>{stock['indicators']['support_desc']}</code>\n"
-                f"   • KDJ指標：低檔金叉 (K:{int(stock['indicators']['k_t'])}|D:{int(stock['indicators']['d_t'])})\n"
-                f"   • MACD動能：綠柱翻紅/縮短 (Hist:{stock['indicators']['macd_hist_t']:.3f})\n"
-            )
-    else:
-        tg_lines.append("📭 今日無完全符合篩選條件之個股。")
-        
-    send_telegram_message("\n".join(tg_lines))
-
-if __name__ == "__main__":
-    main()
+            # Download past 6 months of
