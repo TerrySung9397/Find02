@@ -1,0 +1,31 @@
+name: Run Screener Job
+
+on:
+  schedule:
+    # 台灣時間週一至週五早上 07:00 (UTC 23:00)
+    - cron: '0 23 * * 0-4'
+  workflow_dispatch: # 允許您在 GitHub 介面上手動點擊執行
+
+jobs:
+  run-screener:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. 檢出您的 GitHub 程式碼庫
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. 設定 Python 環境
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      # 3. 安裝依賴 (如果您的程式有 requirements.txt)
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      # 4. 執行您的程式
+      - name: Run screener.py
+        run: python screener.py
