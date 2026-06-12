@@ -13,7 +13,7 @@ HEADERS = {
 }
 
 # Telegram Push Configurations (改為從環境變數讀取)
-TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
+TELEGRAM_TOKEN = os.environ.get('AAE3E5f7dBH40JmPbn7h91JzsxJfZv2tdgw')
 TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', '-5179213819') # Chat ID 若無安全疑慮可保留預設值
 
 def send_telegram_message(text):
